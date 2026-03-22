@@ -37,6 +37,28 @@ CHROMA_DIR   = Path("chroma_db")
 DEFAULT_TOPK = 10
 MAX_TOPK     = 60
 # ──────────────────────────────────────────────────────────────────────────────
+USE_LOCAL_IMAGES = IMAGES_DIR.exists()
+
+if USE_LOCAL_IMAGES:
+    print(f"Image source: local disk ({IMAGES_DIR})\n")
+    dataset = None
+else:
+    print("Image source: HuggingFace dataset (data/images/ not found locally)")
+    print("Loading Flickr8k …")
+    from datasets import load_dataset
+    dataset = load_dataset("jxie/flickr8k", split="train+validation+test")
+    print(f"  Dataset ready: {len(dataset)} images.\n")
+
+
+def load_image(meta: dict) -> Image.Image:
+    """
+    Load an image from local disk or HuggingFace dataset depending on
+    what is available at runtime.
+    """
+    if USE_LOCAL_IMAGES:
+        return Image.open(IMAGES_DIR / meta["filename"]).convert("RGB")
+    else:
+        return dataset[meta["dataset_index"]]["image"].convert("RGB")
 
 # ── Load once at startup ──────────────────────────────────────────────────────
 print(f"\nStarting up on device: {DEVICE}")
@@ -95,6 +117,7 @@ def retrieve(query: str, model_choice: str, top_k: int = DEFAULT_TOPK):
     
     with torch.inference_mode():
         output = model.get_text_features(**inputs)
+        # Gestisce output che potrebbero differire leggermente tra architetture
         text_features = output.pooler_output if hasattr(output, "pooler_output") else output
         
     text_features = torch.nn.functional.normalize(text_features, dim=-1)
@@ -110,10 +133,7 @@ def retrieve(query: str, model_choice: str, top_k: int = DEFAULT_TOPK):
     output_images = []
     if results["distances"] and len(results["distances"]) > 0:
         for i , (meta, dist) in enumerate(zip(results["metadatas"][0], results["distances"][0])):
-            img_path = IMAGES_DIR / meta["filename"]
-            if not img_path.exists():
-                continue
-            img = Image.open(img_path).convert("RGB")
+            img = load_image(meta)
             caption = f"#{i + 1}"
             output_images.append((img,caption))
     
