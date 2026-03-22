@@ -60,16 +60,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def encode_batch(images: list, model, processor, device) -> np.ndarray:
+def encode_batch(images: list, model, processor, device) -> "np.ndarray":
     """Return L2-normalised CLIP image embeddings for a list of PIL images."""
-
     inputs = processor(images=images, return_tensors="pt").to(device)
     with torch.inference_mode():
-        image_features = model.get_image_features(pixel_values=inputs["pixel_values"])
-    if not isinstance(image_features, torch.Tensor):
-        raise TypeError(f"Expected torch.Tensor, got {type(image_features)}")
-    image_features = torch.nn.functional.normalize(image_features, dim=-1)
-    return image_features.cpu().numpy()
+        output = model.get_image_features(pixel_values=inputs["pixel_values"])
+        features = output.pooler_output if hasattr(output, "pooler_output") else output
+    features = torch.nn.functional.normalize(features, dim=-1)
+    return features.cpu().numpy()
 
 
 def save_thumbnail(img: Image.Image, filepath: Path):

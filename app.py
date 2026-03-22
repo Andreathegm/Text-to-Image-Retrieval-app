@@ -30,7 +30,7 @@ IMAGES_DIR   = Path("data/images")
 CHROMA_DIR   = Path("chroma_db")
 COLLECTION   = "flickr8k"
 DEFAULT_TOPK = 10
-MAX_TOPK     = 20
+MAX_TOPK     = 60
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -66,7 +66,7 @@ def retrieve(query: str, top_k: int = DEFAULT_TOPK) -> list[tuple[Image.Image, s
 
     # Encode text
     inputs = processor(text=[query], return_tensors="pt", padding=True).to(DEVICE)
-    with torch.no_grad():
+    with torch.inference_mode():
         output = model.get_text_features(**inputs)
         text_features = output.pooler_output if hasattr(output, "pooler_output") else output
         
@@ -81,18 +81,45 @@ def retrieve(query: str, top_k: int = DEFAULT_TOPK) -> list[tuple[Image.Image, s
     )
 
     # Load and label images
+    # output = []
+    # for meta, dist in zip(results["metadatas"][0], results["distances"][0]):
+    #     img_path = IMAGES_DIR / meta["filename"]
+    #     if not img_path.exists():
+    #         continue
+    #     img = Image.open(img_path).convert("RGB")
+    #     # Chroma cosine distance: 0 = identical, 2 = opposite
+    #     # Convert to a 0–100 similarity score for display
+    #     similarity = round((1 - dist / 2) * 100, 1)
+    #     caption = f"Score: {similarity}%"
+    #     output.append((img, caption))
+
+    # return output
+    # Il range effettivo di similarità coseno di CLIP va tipicamente da 0.15 (scarso) a 0.35 (ottimo)
+    # Distanza Chroma = 1 - CosSim -> quindi le distanze andranno da circa 0.85 (scarso) a 0.65 (ottimo)
+    
+    MIN_EXPECTED_SIM = 0.15 
+    MAX_EXPECTED_SIM = 0.32 
+
     output = []
     for meta, dist in zip(results["metadatas"][0], results["distances"][0]):
         img_path = IMAGES_DIR / meta["filename"]
         if not img_path.exists():
             continue
         img = Image.open(img_path).convert("RGB")
-        # Chroma cosine distance: 0 = identical, 2 = opposite
-        # Convert to a 0–100 similarity score for display
-        similarity = round((1 - dist / 2) * 100, 1)
-        caption = f"Score: {similarity}%"
+        
+        # 1. Recupera la similarità coseno originale dalla distanza di Chroma
+        cos_sim = 1 - dist
+        
+        # 2. Clampa il valore per evitare percentuali fuori scala (<0% o >100%)
+        cos_sim_clamped = max(MIN_EXPECTED_SIM, min(MAX_EXPECTED_SIM, cos_sim))
+        
+        # 3. Mappa il range ristretto sulla scala 0-100
+        normalized_score = (cos_sim_clamped - MIN_EXPECTED_SIM) / (MAX_EXPECTED_SIM - MIN_EXPECTED_SIM)
+        similarity_pct = round(normalized_score * 100, 1)
+        
+        caption = f"Score: {similarity_pct}%"
         output.append((img, caption))
-
+    
     return output
 
 
