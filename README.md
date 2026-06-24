@@ -116,22 +116,14 @@ architecture-agnostic.
     - `retrieve(query, model_choice, top_k)`
        Executes the core inference and search loop. It tokenizes the text, bypasses the PyTorch autograd engine via `torch.inference_mode()` and extracts text embeddings. It explicitly applies $L_2$ normalization (`torch.nn.functional.normalize`) Finally, it uses ChromaDB's `.query()` to efficiently traverse the vector index and fetch the closest matches.
 
-
-
-
-
-
-
-
-
-
-
-
 ---
 ### References
-https://techascent.com/blog/memory-mapping-arrow.html
-https://docs.trychroma.com/docs
-https://gradio.app/guides/quickstart
+https://techascent.com/blog/memory-mapping-arrow.html (memory-mapping)   
+https://docs.trychroma.com/docs (Chroma)  
+https://gradio.app/guides/quickstart (Gradio)  
+https://arxiv.org/pdf/2303.15343 (Sigmoid Loss for Language Image Pre-Training)
+https://www.youtube.com/watch?v=chz74Mtd1AA (Explanation of ANN and HNSW)
+
 ### AI usage
 https://gemini.google.com/gem/f94e84ceea07/6df449e83abaf3ed (for rembering some choices made and details about the apis I used)  
 https://claude.ai/chat/8a9bda37-77cb-44e3-9410-2ff55aa1a762(for writing a draft of this readme file and also helped me manage better the reproducibilty of the conda env.)
