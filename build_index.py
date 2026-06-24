@@ -1,19 +1,3 @@
-"""
-build_index.py
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Run ONCE on a machine with a GPU to:
-  1. Download the Flickr8k dataset from HuggingFace
-  2. Encode every image with CLIP or SigLIP
-  3. Persist embeddings in a local ChromaDB vector database (separate collections)
-  4. Save 256×256 JPEG thumbnails to data/images/
-
-Usage:
-  python build_index.py --model-type clip
-  python build_index.py --model-type siglip
-  python build_index.py --model-type siglip --batch-size 32
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-
 import argparse
 from pathlib import Path
 
@@ -25,7 +9,7 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoModel, AutoProcessor
 
-# ── Configurazione Modelli ────────────────────────────────────────────────────
+# Model configs
 MODEL_REGISTRY = {
     "clip": {
         "hf_path": "openai/clip-vit-base-patch16",
@@ -37,7 +21,6 @@ MODEL_REGISTRY = {
     }
 }
 
-# ── Defaults ──────────────────────────────────────────────────────────────────
 DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
 DATASET_NAME = "jxie/flickr8k"
 ALL_SPLITS   = ["train", "validation", "test"]
@@ -46,18 +29,17 @@ THUMBNAIL_SIZE = (256, 256)
 IMAGES_DIR   = Path("data/images")
 CHROMA_DIR   = Path("chroma_db")
 CHROMA_UPSERT_CHUNK = 500
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Build Vector Index for Flickr8k")
     parser.add_argument(
         "--model-type", type=str, required=True, choices=["clip", "siglip"],
-        help="Scegli quale modello usare per generare gli embedding"
+        help="Choose the model to generate the embeddings"
     )
     parser.add_argument(
         "--batch-size", type=int, default=BATCH_SIZE,
-        help="Images per forward pass (lower if CUDA OOM)"
+        help="Images per forward pass"
     )
     parser.add_argument(
         "--splits", nargs="+", default=ALL_SPLITS,
@@ -76,7 +58,6 @@ def encode_batch(images: list, model, processor, device) -> np.ndarray:
     inputs = processor(images=images, return_tensors="pt").to(device)
     with torch.inference_mode():
         output = model.get_image_features(pixel_values=inputs["pixel_values"])
-        # Gestisce eventuali differenze nell'output tra architetture
         features = output.pooler_output if hasattr(output, "pooler_output") else output
     
     features = torch.nn.functional.normalize(features, dim=-1)
@@ -88,7 +69,7 @@ def save_thumbnail(img: Image.Image, filepath: Path):
     if filepath.exists():
         return
     rgb = img.convert("RGB")
-    rgb.thumbnail(THUMBNAIL_SIZE, Image.LANCZOS)
+    rgb.thumbnail(THUMBNAIL_SIZE, Image.LANCZOS) 
     filepath.parent.mkdir(parents=True, exist_ok=True)
     rgb.save(filepath, "JPEG", quality=85)
 
@@ -123,24 +104,24 @@ def main():
     IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     CHROMA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # ── Load Model ────────────────────────────────────────────────────────────
+    # Load the model
     print(f"Loading {args.model_type.upper()} model …")
     model = AutoModel.from_pretrained(hf_model_path).to(DEVICE)
     processor = AutoProcessor.from_pretrained(hf_model_path)
     model.eval()
     print("  Done.\n")
 
-    # ── Load dataset ──────────────────────────────────────────────────────────
+    #Load the dataset
     print(f"Downloading {DATASET_NAME} …")
     splits = [load_dataset(DATASET_NAME, split=s) for s in args.splits]
     dataset = concatenate_datasets(splits)
-    print(f"  Total images to index: {len(dataset)}\n")
+    print(f"Total images to index: {len(dataset)}\n")
 
     # ── ChromaDB setup ────────────────────────────────────────────────────────
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 
     if args.force:
-        print("  --force flag set: deleting existing collection …")
+        print("--force flag set: deleting existing collection …")
         try:
             client.delete_collection(collection_name)
         except Exception:
@@ -157,7 +138,7 @@ def main():
             "Run with --force to rebuild.\n"
         )
 
-    # ── Encode and index ──────────────────────────────────────────────────────
+    # Encode and index
     print("Encoding images …\n")
 
     pending_embs, pending_ids, pending_meta = [], [], []
@@ -191,12 +172,11 @@ def main():
 
     flush_to_chroma(collection, pending_embs, pending_ids, pending_meta)
 
-    # ── Summary ───────────────────────────────────────────────────────────────
     total = collection.count()
     print(f"\n{'─'*60}")
-    print(f"  ✓ Indexed {total} images into '{collection_name}'")
-    print(f"  ✓ ChromaDB saved to  : {CHROMA_DIR}/")
-    print(f"  ✓ Thumbnails saved to: {IMAGES_DIR}/")
+    print(f"Indexed {total} images into '{collection_name}'")
+    print(f"ChromaDB saved to  : {CHROMA_DIR}/")
+    print(f"Thumbnails saved to: {IMAGES_DIR}/")
     print(f"{'─'*60}\n")
 
 if __name__ == "__main__":

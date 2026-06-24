@@ -1,15 +1,3 @@
-"""
-app.py
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Gradio web app for text-to-image retrieval supporting both CLIP and SigLIP.
-
-How it works:
-  1. At startup: load both models + both ChromaDB collections.
-  2. On query : encode the user's prompt with the selected model → 
-     search the respective collection → return top-K images.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-
 from pathlib import Path
 
 import chromadb
@@ -18,7 +6,6 @@ import torch
 from PIL import Image
 from transformers import AutoModel, AutoProcessor
 
-# ── Config ────────────────────────────────────────────────────────────────────
 DEVICE       = "cuda" if torch.cuda.is_available() else "cpu"
 
 MODELS_CONFIG = {
@@ -36,7 +23,7 @@ IMAGES_DIR   = Path("data/images")
 CHROMA_DIR   = Path("chroma_db")
 DEFAULT_TOPK = 10
 MAX_TOPK     = 60
-# ──────────────────────────────────────────────────────────────────────────────
+
 USE_LOCAL_IMAGES = IMAGES_DIR.exists()
 
 if USE_LOCAL_IMAGES:
@@ -60,14 +47,13 @@ def load_image(meta: dict) -> Image.Image:
     else:
         return dataset[meta["dataset_index"]]["image"].convert("RGB")
 
-# ── Load once at startup ──────────────────────────────────────────────────────
 print(f"\nStarting up on device: {DEVICE}")
 
 loaded_models = {}
 loaded_processors = {}
 loaded_collections = {}
 
-# 1. Carica i Modelli
+# Loads the models
 for model_key, config in MODELS_CONFIG.items():
     print(f"Loading {model_key} model from {config['path']} …")
     model = AutoModel.from_pretrained(config["path"]).to(DEVICE)
@@ -77,6 +63,7 @@ for model_key, config in MODELS_CONFIG.items():
     loaded_models[model_key] = model
     loaded_processors[model_key] = processor
 
+# chroma db connection 
 print("\nConnecting to ChromaDB …")
 if not (CHROMA_DIR / "chroma.sqlite3").exists():
     raise FileNotFoundError(
@@ -86,7 +73,7 @@ if not (CHROMA_DIR / "chroma.sqlite3").exists():
 
 chroma_client = chromadb.PersistentClient(path=str(CHROMA_DIR))
 
-# 2. Carica le Collezioni
+# load the collections
 for model_key, config in MODELS_CONFIG.items():
     try:
         col = chroma_client.get_collection(config["collection_name"])
@@ -96,7 +83,7 @@ for model_key, config in MODELS_CONFIG.items():
         print(f"  Warning: Could not load collection '{config['collection_name']}'. Did you run build_index.py for {model_key}?")
 
 
-# ── Core retrieval function ───────────────────────────────────────────────────
+# retrieval function
 def retrieve(query: str, model_choice: str, top_k: int = DEFAULT_TOPK):
     """
     Encode `query` with the chosen model and return the top-k matching (image, score) pairs.
@@ -117,7 +104,6 @@ def retrieve(query: str, model_choice: str, top_k: int = DEFAULT_TOPK):
     
     with torch.inference_mode():
         output = model.get_text_features(**inputs)
-        # Gestisce output che potrebbero differire leggermente tra architetture
         text_features = output.pooler_output if hasattr(output, "pooler_output") else output
         
     text_features = torch.nn.functional.normalize(text_features, dim=-1)
@@ -140,7 +126,7 @@ def retrieve(query: str, model_choice: str, top_k: int = DEFAULT_TOPK):
     return output_images
 
 
-# ── Gradio UI ─────────────────────────────────────────────────────────────────
+#Gradio WEB UI
 _EXAMPLES = [
     ["a dog playing in the snow", "CLIP"],
     ["children playing at a park", "SigLIP"],
@@ -195,7 +181,6 @@ with gr.Blocks(
         label="Try one of these …",
     )
 
-    # Wire up interactions (pass model_selector come input aggiuntivo)
     search_btn.click(fn=retrieve, inputs=[query_box, model_selector, topk_slider], outputs=gallery)
     query_box.submit(fn=retrieve, inputs=[query_box, model_selector, topk_slider], outputs=gallery)
 
