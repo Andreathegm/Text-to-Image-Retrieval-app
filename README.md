@@ -98,7 +98,7 @@ architecture-agnostic.
 - **build_index-py**  
 
     **General Pipeline Logic** :  
-    The script implements (ETL:Extract-Trasform-Load) pipeline for image data. It fetches the Flickr8k dataset using memory-mapped Apache Arrow structures() (just using load_dataset()), processes the images using Transformers (CLIP or SigLIP) to extract features and normalizes them. Finally, it persists these embeddings into a local ChromaDB instance configured with an HNSW (Hierarchical Navigable Small World) graph for efficient approximate nearest neighbor (ANN) search, while saving downsampled thumbnails to disk
+    The script implements (ETL:Extract-Trasform-Load) pipeline for image data. It fetches the Flickr8k dataset using memory-mapped Apache Arrow structures (I just using load_dataset() ), processes the images using Transformers (CLIP or SigLIP) to extract features and normalizes them. Finally, it persists these embeddings into a local ChromaDB instance configured with an HNSW (Hierarchical Navigable Small World) graph for efficient approximate nearest neighbor (ANN) search, while saving downsampled thumbnails to disk
 
     - `encode_batch(images, model, processor, device)`
         Converts raw PIL images into batched PyTorch tensors, extracts pooled features from the model, applies $L_2$ normalization, and detaches the tensor back to a NumPy array.
@@ -118,17 +118,22 @@ architecture-agnostic.
 
 ---
 ### References
-https://techascent.com/blog/memory-mapping-arrow.html (memory-mapping)   
+https://techascent.com/blog/memory-mapping-arrow.html (memory-mapping)  
+
 https://docs.trychroma.com/docs (Chroma)  
+
 https://gradio.app/guides/quickstart (Gradio)  
-https://arxiv.org/pdf/2303.15343 (Sigmoid Loss for Language Image Pre-Training)
+
+https://arxiv.org/pdf/2303.15343 (Sigmoid Loss for Language Image Pre-Training)  
+
 https://www.youtube.com/watch?v=chz74Mtd1AA (Explanation of ANN and HNSW)
 
 ### AI usage
-https://gemini.google.com/gem/f94e84ceea07/6df449e83abaf3ed (for rembering some choices made and details about the apis I used)  
+https://gemini.google.com/gem/f94e84ceea07/6df449e83abaf3ed  
+
 https://claude.ai/chat/8a9bda37-77cb-44e3-9410-2ff55aa1a762(for writing a draft of this readme file and also helped me manage better the reproducibilty of the conda env.)
 
-I used AI assistance to generate the Gradio UI section of the script. For the remaining parts, I implemented the functions myself, although in a few cases I relied on AI‑generated code, which I subsequently verified against the official API documentations.
+I used AI assistance to generate the Gradio UI section of the script. For the remaining parts, I implemented the functions myself, although in a few cases I relied on AI to help me debug and implement some operations, which I subsequently verified against the official API documentations.
 
-Since I initially implemented everything in a sort of monolithic structure, I used AI to add some print statements. However, I know it would be better to split the code into a more modular structure.
+Since I initially implemented everything in a sort of monolithic structure, I used AI to add some print statements and put the code in a nicer way. However, I know it would be better to split the code into a more modular structure.
 
