@@ -8,8 +8,9 @@ To try the app follow this link : [Text-to-ImageApp](https://huggingface.co/spac
 ---
 
 ## Architecture
-
-![App-diagram](.repo_images/app-diagram.png)
+<p align="center">
+    <img src=.repo_images/app-diagram.png alt="App-diagram" width ="350">
+</p>
 
 
 Embeddings are computed **once** at index time (`build_index.py`) and stored in
